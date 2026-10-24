@@ -9,8 +9,13 @@
 #include <utility>
 #include <vector>
 
+#include "Grid.h"
+#include "NavProfile.h"
+
 // This was a help source I used for ideas
 // https://www.redblobgames.com/pathfinding/a-star/implementation.html
+namespace Pathfinding
+{
 
 inline constexpr size_t INVALID_IDX = std::numeric_limits<size_t>::max();
 inline constexpr uint32_t INVALID_COST = std::numeric_limits<uint32_t>::max();
@@ -32,23 +37,24 @@ struct Node
 class AStar
 {
 public:
-    AStar(int32_t gridWidth, int32_t gridHeight);
+    // TODO: Optimize for static grid
+    // The grid is referenced, not copied: it must outlive this object and keep its dimensions
+    // Changing terrain between searches is fine.
+    explicit AStar(const Grid& grid);
+    AStar(const Grid&&) = delete; // Refuse temporaries, we would be left holding a dangling pointer
 
     // Returns false if end is unreachable
     // outPath is cleared first, and start/end inclusive
-    bool FindPath(size_t startIdx, size_t endIdx, std::deque<size_t>& outPath);
+    bool FindPath(size_t startIdx, size_t endIdx, std::deque<size_t>& outPath,
+                  const NavProfile& profile = NavProfile{});
 
     // Read-only access for last search (for debug visualisation)
     const std::vector<Node>& GetOpen() const { return m_Open; }
     const std::vector<Node>& GetClosed() const { return m_Closed; }
 
-    int32_t GetGridWidth() const { return m_GridWidth; }
-    int32_t GetGridHeight() const { return m_GridHeight; }
-
 private:
-    // Assuming y is vertical and x horizontal, and (0,0) is topLeft
-    size_t Get1DIdx(int32_t x, int32_t y) const;
-    std::pair<int32_t, int32_t> Get2DIdx(size_t idx) const;
+    bool IsBlocked(int32_t x, int32_t y) const;
+    bool IsBlocked(size_t idx) const;
 
     // Finds all neighbors for a idx and stores them in m_NeighborList,
     // does not clear list, and returns the number of valid entries
@@ -68,8 +74,8 @@ private:
     // Clears all per search states
     void Reset();
 
-    int32_t m_GridWidth;
-    int32_t m_GridHeight;
+    const Grid* m_pGrid;
+    NavProfile m_Profile; // copy of the rules for the search in progress
 
     size_t m_StartIdx = INVALID_IDX;
     size_t m_EndIdx = INVALID_IDX;
@@ -82,3 +88,5 @@ private:
 
     std::array<size_t, 8> m_NeighborList{};
 };
+
+}

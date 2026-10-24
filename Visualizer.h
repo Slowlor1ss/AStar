@@ -1,21 +1,31 @@
 #pragma once
 
-#include <vector>
+#include <cstddef>
+#include <cstdint>
 #include <deque>
 #include <iostream>
 #include <unordered_set>
 
-struct Node;
+#include "Grid.h"
 
-class Visualizer {
+namespace Pathfinding::Debug
+{
+
+class Visualizer 
+{
 public:
+    // The node containers are templated so the visualizer only needs nodes to have an `idx`,
+    // it does not have to know the Node type
     template <typename TNodeContainer>
-    static void PrintGrid(int32_t width, int32_t height, 
+    static void PrintGrid(const Grid& grid,
                           size_t startIdx, size_t endIdx,
                           const TNodeContainer& openList, 
                           const TNodeContainer& closedList,
                           const std::deque<size_t>& path) 
     {
+        const int32_t width = grid.GetWidth();
+        const int32_t height = grid.GetHeight();
+
         // Collect idx's for lookups while drawing
         std::unordered_set<size_t> openIndices;
         for (const auto& n : openList) {
@@ -43,7 +53,8 @@ public:
             
             for (int32_t x = 0; x < width; ++x) 
             {
-                size_t currentIdx = static_cast<size_t>(width * y + x);
+                const size_t currentIdx = grid.Get1DIdx(x, y);
+                const TerrainFlags terrain = grid.GetTerrain(currentIdx);
 
                 if (currentIdx == startIdx) {
                     std::cout << "S"; // Start
@@ -51,6 +62,10 @@ public:
                     std::cout << "E"; // End
                 } else if (pathIndices.contains(currentIdx)) {
                     std::cout << "x"; // Actual path taken
+                } else if (terrain != TerrainFlags::None) {
+                    // Terrain wins over the search markers so passable terrain
+                    // (mud, water, ...) stays visible, blocked cells are never searched anyway
+                    std::cout << TerrainGlyph(terrain);
                 } else if (closedIndices.contains(currentIdx)) {
                     std::cout << "."; // Processed Graveyard
                 } else if (openIndices.contains(currentIdx)) {
@@ -67,6 +82,21 @@ public:
         for (int32_t x = 0; x < width; ++x) std::cout << "-";
         std::cout << "+\n";
         
-        std::cout << "Legend: S=Start | E=End | x=Path | .=Closed | ?=Open\n\n";
+        std::cout << "Legend: S=Start | E=End | x=Path | .=Closed | ?=Open\n"
+                  << "        #=Wall | ~=Water | %=Mud | ^=Lava\n\n";
+    }
+
+private:
+    // Keep in sync with TerrainFlags (and the legend above) when you add terrain types
+    static char TerrainGlyph(TerrainFlags terrain)
+    {
+        // A cell can carry several flags, draw the most important one
+        if (HasAnyFlag(terrain, TerrainFlags::Wall))  return '#';
+        if (HasAnyFlag(terrain, TerrainFlags::Lava))  return '^';
+        if (HasAnyFlag(terrain, TerrainFlags::Water)) return '~';
+        if (HasAnyFlag(terrain, TerrainFlags::Mud))   return '%';
+        return '!'; // Flags we have no glyph for yet
     }
 };
+
+}

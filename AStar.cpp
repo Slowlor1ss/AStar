@@ -4,22 +4,28 @@
 #include <cassert>
 #include <cstdlib>
 
-AStar::AStar(int32_t gridWidth, int32_t gridHeight)
-    : m_GridWidth(gridWidth)
-    , m_GridHeight(gridHeight)
-    , m_IsClosed(static_cast<size_t>(gridWidth) * gridHeight, false)
-    , m_Parent(static_cast<size_t>(gridWidth) * gridHeight, INVALID_IDX)
+namespace Pathfinding
 {
-    assert(gridWidth > 0 && gridHeight > 0 && "Grid dimensions must be positive");
+
+AStar::AStar(const Grid& grid)
+    : m_pGrid(&grid)
+    , m_IsClosed(grid.GetCellCount(), false)
+    , m_Parent(grid.GetCellCount(), INVALID_IDX)
+{
 }
 
-bool AStar::FindPath(size_t startIdx, size_t endIdx, std::deque<size_t>& outPath)
+
+bool AStar::FindPath(size_t startIdx, size_t endIdx, std::deque<size_t>& outPath, const NavProfile& profile)
 {
     outPath.clear();
 
     // TODO: error handling this should never happen if you use the code correctly
-    const size_t cellCount = m_IsClosed.size();
-    if (startIdx >= cellCount || endIdx >= cellCount)
+    if (!m_pGrid->IsValidIdx(startIdx) || !m_pGrid->IsValidIdx(endIdx))
+        return false;
+ 
+    m_Profile = profile;
+ 
+    if (IsBlocked(startIdx) || IsBlocked(endIdx))
         return false;
 
     Reset();
@@ -63,21 +69,19 @@ void AStar::Reset()
     std::fill(m_Parent.begin(), m_Parent.end(), INVALID_IDX);
 }
 
-size_t AStar::Get1DIdx(int32_t x, int32_t y) const
+bool AStar::IsBlocked(int32_t x, int32_t y) const
 {
-    return static_cast<size_t>(m_GridWidth) * y + x;
+    return m_Profile.IsBlocked(m_pGrid->GetTerrain(x, y));
 }
-
-std::pair<int32_t, int32_t> AStar::Get2DIdx(size_t idx) const
+ 
+bool AStar::IsBlocked(size_t idx) const
 {
-    int32_t x = static_cast<int32_t>(idx % m_GridWidth);
-    int32_t y = static_cast<int32_t>(idx / m_GridWidth);
-    return {x, y};
+    return m_Profile.IsBlocked(m_pGrid->GetTerrain(idx));
 }
 
 size_t AStar::FillNeighborList(size_t index)
 {
-    auto [x, y] = Get2DIdx(index);
+    auto [x, y] = m_pGrid->Get2DIdx(index);
 
     size_t count = 0;
     for (int32_t dy = -1; dy <= 1; ++dy)
@@ -91,11 +95,21 @@ size_t AStar::FillNeighborList(size_t index)
             int32_t nx = x + dx;
             int32_t ny = y + dy;
 
-            if (nx < 0 || nx >= m_GridWidth ||
-                ny < 0 || ny >= m_GridHeight)
+            if (!m_pGrid->IsInBounds(nx, ny))
+                continue;
+ 
+            if (IsBlocked(nx, ny))
                 continue;
 
-            m_NeighborList[count] = Get1DIdx(nx, ny);
+            // Handle diagonal, if allowed we skip the blocked check, 
+            // if not make sure common adjacent cells are free
+            const bool isDiagonal = dx != 0 && dy != 0;
+            if (isDiagonal && !m_Profile.allowCornerCutting &&
+                (IsBlocked(nx, y) || IsBlocked(x, ny)))
+                continue;
+
+
+            m_NeighborList[count] = m_pGrid->Get1DIdx(nx, ny);
             ++count;
         }
     }
@@ -104,8 +118,8 @@ size_t AStar::FillNeighborList(size_t index)
 
 uint32_t AStar::GetOctileDistance(size_t a, size_t b) const
 {
-    auto [ax, ay] = Get2DIdx(a);
-    auto [bx, by] = Get2DIdx(b);
+    auto [ax, ay] = m_pGrid->Get2DIdx(a);
+    auto [bx, by] = m_pGrid->Get2DIdx(b);
 
     // Calculate differences
     int32_t dx = std::abs(ax - bx);
@@ -171,4 +185,6 @@ void AStar::ReconstructPath(std::deque<size_t>& outPath) const
 {
     for (size_t idx = m_EndIdx; idx != INVALID_IDX; idx = m_Parent[idx])
         outPath.push_front(idx);
+}
+
 }
