@@ -76,7 +76,8 @@ private:
 
     std::vector<Node> m_Open;
     std::vector<Node> m_Closed;
-    std::vector<bool> m_IsClosed; // Prevents havng to check if neighbor is already in closed list
+    // https://stackoverflow.com/questions/55207770/performance-difference-using-vectorbool-vs-vectoruint8-t
+    std::vector<uint8_t> m_IsClosed; // Prevents havng to check if neighbor is already in closed list
     std::vector<size_t> m_Parent; // filled when a node is closed, prevents us from having to look trough the closed list when reconstructing path
 
     std::array<size_t, 8> m_NeighborList{};
