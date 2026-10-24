@@ -1,12 +1,10 @@
-#ifndef VISUALIZER_H
-#define VISUALIZER_H
+#pragma once
 
 #include <vector>
 #include <deque>
 #include <iostream>
 #include <unordered_set>
 
-// Forward declaration of Node structure from main file to avoid cyclic dependencies
 struct Node;
 
 class Visualizer {
@@ -72,5 +70,3 @@ public:
         std::cout << "Legend: S=Start | E=End | x=Path | .=Closed | ?=Open\n\n";
     }
 };
-
-#endif // VISUALIZER_H
