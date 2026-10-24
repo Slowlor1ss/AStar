@@ -161,7 +161,7 @@ void AStar::ExploreNeighbors(const Node& current)
         nNode.hCost = GetDistanceBetweenNodes(neighborIdx, m_EndIdx);
 
         // Duplicates are fine for now, PopCheapestOpen discards stale ones
-        m_Open.push_back(nNode);
+        m_Open.push(nNode);
     }
 }
 
@@ -169,15 +169,7 @@ std::optional<Node> AStar::PopCheapestOpen()
 {
     while (!m_Open.empty())
     {
-        auto cheapestOpenit = std::min_element(m_Open.begin(), m_Open.end(),
-            [](const Node& a, const Node& b) { return a < b; });
-
-        Node node = *cheapestOpenit;
-
-        //m_Open.erase(cheapestOpenit);
-        // Swap and pop!
-        *cheapestOpenit = m_Open.back();
-        m_Open.pop_back();
+        const Node node = m_Open.pop_best();
 
         // Stale duplicate of a cell we already finished, skip it
         if (m_IsClosed[node.idx])
