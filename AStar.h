@@ -34,6 +34,11 @@ struct Node
     // which I wont implement yet untill needed as i want to be aware of it
     // Weak ordering -> two different nodes can be equivalent 
     // (same f and h) without being equal
+    //
+    // We prefer the lower h cost in a tie breaker senario
+    // this makes up basically prefer to go in the direction of the goal
+    // this can makes explore less nodes 
+    // and has the added benefit of creating more natural paths
     std::weak_ordering operator<=>(const Node& other) const
     {
         const auto cmp = Cost() <=> other.Cost();
