@@ -170,7 +170,7 @@ std::optional<Node> AStar::PopCheapestOpen()
     while (!m_Open.empty())
     {
         auto cheapestOpenit = std::min_element(m_Open.begin(), m_Open.end(),
-            [](const Node& a, const Node& b) { return a.Cost() < b.Cost(); });
+            [](const Node& a, const Node& b) { return a < b; });
 
         Node node = *cheapestOpenit;
 

@@ -28,6 +28,20 @@ struct Node
     size_t parentIdx = INVALID_IDX;
 
     uint32_t Cost() const { return gCost + hCost; }
+
+    // Spaceship operator! :D
+    // Using this also has the benefit of deliting the == operator
+    // which I wont implement yet untill needed as i want to be aware of it
+    // Weak ordering -> two different nodes can be equivalent 
+    // (same f and h) without being equal
+    std::weak_ordering operator<=>(const Node& other) const
+    {
+        const auto cmp = Cost() <=> other.Cost();
+        if (cmp != 0)
+            return cmp;
+        return hCost <=> other.hCost;
+    }
+
 };
 
 // A* on a 2D grid with 8-way movement (octile distance, 10 straight / 14 diagonal).
