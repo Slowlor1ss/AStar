@@ -62,6 +62,7 @@ private:
 
     uint32_t GetOctileDistance(size_t a, size_t b) const;
     uint32_t GetDistanceBetweenNodes(size_t a, size_t b) const;
+    uint32_t GetStepCost(size_t from, size_t to) const;
 
     void ExploreNeighbors(const Node& current);
 

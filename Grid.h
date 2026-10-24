@@ -2,6 +2,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <limits>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -18,19 +20,24 @@ enum class TerrainFlags : uint16_t
     Lava  = 1 << 3,
 };
 
+// We do this so we can safely resize our terrain flags should we want more
+using TerrainType_t = std::underlying_type_t<TerrainFlags>;
+inline constexpr size_t TERRAIN_TYPE_COUNT = std::numeric_limits<TerrainType_t>::digits;
+
+
 constexpr TerrainFlags operator|(TerrainFlags a, TerrainFlags b)
 {
-    return static_cast<TerrainFlags>(static_cast<uint16_t>(a) | static_cast<uint16_t>(b));
+    return static_cast<TerrainFlags>(static_cast<TerrainType_t>(a) | static_cast<TerrainType_t>(b));
 }
 
 constexpr TerrainFlags operator&(TerrainFlags a, TerrainFlags b)
 {
-    return static_cast<TerrainFlags>(static_cast<uint16_t>(a) & static_cast<uint16_t>(b));
+    return static_cast<TerrainFlags>(static_cast<TerrainType_t>(a) & static_cast<TerrainType_t>(b));
 }
 
 constexpr TerrainFlags operator~(TerrainFlags a)
 {
-    return static_cast<TerrainFlags>(~static_cast<uint16_t>(a));
+    return static_cast<TerrainFlags>(~static_cast<TerrainType_t>(a));
 }
 
 constexpr TerrainFlags& operator|=(TerrainFlags& a, TerrainFlags b) { return a = a | b; }

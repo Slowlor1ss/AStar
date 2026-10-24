@@ -137,6 +137,14 @@ uint32_t AStar::GetDistanceBetweenNodes(size_t a, size_t b) const
     return GetOctileDistance(a, b);
 }
 
+uint32_t AStar::GetStepCost(size_t from, size_t to) const
+{
+    // Octile distance between two adjacent cells is exactly the base step: 10 or 14
+    const uint32_t baseStep = GetDistanceBetweenNodes(from, to);
+    const uint32_t costPercent = m_Profile.GetCellCostPercent(m_pGrid->GetTerrain(to));
+    return baseStep * costPercent / COST_PERCENT_NORMAL;
+}
+
 void AStar::ExploreNeighbors(const Node& current)
 {
     size_t end = FillNeighborList(current.idx);
@@ -149,7 +157,7 @@ void AStar::ExploreNeighbors(const Node& current)
         Node nNode;
         nNode.idx = neighborIdx;
         nNode.parentIdx = current.idx;
-        nNode.gCost = current.gCost + GetDistanceBetweenNodes(current.idx, neighborIdx);
+                nNode.gCost = current.gCost + GetStepCost(current.idx, neighborIdx);
         nNode.hCost = GetDistanceBetweenNodes(neighborIdx, m_EndIdx);
 
         // Duplicates are fine for now, PopCheapestOpen discards stale ones
