@@ -15,22 +15,29 @@ AStar::AStar(const Grid& grid)
 }
 
 
-bool AStar::FindPath(size_t startIdx, size_t endIdx, std::deque<size_t>& outPath, const NavProfile& profile)
+SearchStatus AStar::Begin(size_t startIdx, size_t endIdx, const NavProfile& profile, size_t maxTotalExpansions)
 {
-    outPath.clear();
+    // Start fresh this also drops any search that was still going
+    Reset();
 
     // TODO: error handling this should never happen if you use the code correctly
     if (!m_pGrid->IsValidIdx(startIdx) || !m_pGrid->IsValidIdx(endIdx))
-        return false;
- 
-    m_Profile = profile;
- 
-    if (IsBlocked(startIdx) || IsBlocked(endIdx))
-        return false;
+    {
+        m_Status = SearchStatus::InvalidRequest;
+        return m_Status;
+    }
 
-    Reset();
+    m_Profile = profile;
+
+    if (IsBlocked(startIdx) || IsBlocked(endIdx))
+    {
+        m_Status = SearchStatus::NoPath;
+        return m_Status;
+    }
+
     m_StartIdx = startIdx;
     m_EndIdx = endIdx;
+    m_ExpansionLimit = maxTotalExpansions;
 
     Node startNode;
     startNode.idx = m_StartIdx;
@@ -44,21 +51,74 @@ bool AStar::FindPath(size_t startIdx, size_t endIdx, std::deque<size_t>& outPath
     m_IsClosed[m_StartIdx] = true;
     m_Parent[m_StartIdx] = INVALID_IDX;
 
+    m_Status = SearchStatus::InProgress;
+    return m_Status;
+}
+
+SearchStatus AStar::Step(size_t maxExpansions)
+{
+    // Idle or already finished, nothing to do
+    if (m_Status != SearchStatus::InProgress)
+        return m_Status;
+
+    size_t expandedThisStep = 0;
     while (m_Closed.back().idx != m_EndIdx)
     {
+        // Gave up on the search as a whole?
+        if (m_ExpansionCount >= m_ExpansionLimit)
+        {
+            m_Status = SearchStatus::LimitReached;
+            return m_Status;
+        }
+
+        // Used up the budget of this call, the next Step carries on 
+        if (expandedThisStep >= maxExpansions)
+            return m_Status; // Still InProgress
+
         ExploreNeighbors(m_Closed.back());
 
         std::optional<Node> next = PopCheapestOpen();
         if (!next)
-            return false; // End is unreachable
+        {
+            m_Status = SearchStatus::NoPath;
+            return m_Status;
+        }
 
         m_IsClosed[next->idx] = true;
         m_Parent[next->idx] = next->parentIdx;
         m_Closed.push_back(*next);
+
+        ++m_ExpansionCount;
+        ++expandedThisStep;
     }
+
+    m_Status = SearchStatus::Found;
+    return m_Status;
+}
+
+bool AStar::GetPath(std::deque<size_t>& outPath) const
+{
+    // TODO: return a path to the closest node if the goal is unreachable
+    outPath.clear();
+    if (m_Status != SearchStatus::Found)
+        return false;
 
     ReconstructPath(outPath);
     return true;
+}
+
+bool AStar::FindPath(size_t startIdx, size_t endIdx, std::deque<size_t>& outPath,
+                     const NavProfile& profile, size_t maxTotalExpansions)
+{
+    outPath.clear();
+
+    if (Begin(startIdx, endIdx, profile, maxTotalExpansions) != SearchStatus::InProgress)
+        return false;
+
+    if (Step(UNLIMITED_EXPANSIONS) != SearchStatus::Found)
+        return false;
+
+    return GetPath(outPath);
 }
 
 void AStar::Reset()
@@ -67,6 +127,10 @@ void AStar::Reset()
     m_Closed.clear();
     std::fill(m_IsClosed.begin(), m_IsClosed.end(), false);
     std::fill(m_Parent.begin(), m_Parent.end(), INVALID_IDX);
+
+    m_Status = SearchStatus::Idle;
+    m_ExpansionCount = 0;
+    m_ExpansionLimit = UNLIMITED_EXPANSIONS;
 }
 
 bool AStar::IsBlocked(int32_t x, int32_t y) const

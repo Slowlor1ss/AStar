@@ -1,9 +1,13 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
+#include <cassert>
+#include <compare>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <functional>
 #include <limits>
 #include <optional>
 #include <utility>
@@ -21,6 +25,18 @@ namespace Pathfinding
 
 inline constexpr size_t INVALID_IDX = std::numeric_limits<size_t>::max();
 inline constexpr uint32_t INVALID_COST = std::numeric_limits<uint32_t>::max();
+inline constexpr size_t UNLIMITED_EXPANSIONS = std::numeric_limits<size_t>::max();
+
+// Where a search currently is, see AStar::Begin and AStar::Step
+enum class SearchStatus : uint8_t
+{
+    Idle,
+    InProgress,
+    Found,
+    NoPath,
+    LimitReached,
+    InvalidRequest,
+};
 
 struct Node
 {
@@ -102,9 +118,12 @@ private:
 };
 
 // A* on a 2D grid with 8-way movement (octile distance, 10 straight / 14 diagonal).
-// Nodes are stored by value in contiguous vectors and referred to by cell index,
-// never by pointer, so growing a vector can never leave us with dangling references.
-// Storage is owned by the object and reused between searches.
+// 
+// Begin sets a search up, then call Step (e.g. once per frame) until the status is no longer
+// InProgress, then fetch the result with GetPath
+// Every Step carries on exactly where the previous one stopped
+// Calling Begin again stops the search tha was still ongoing
+// (The grid's terrain should not change while a search is in progress)
 class AStar
 {
 public:
@@ -114,10 +133,27 @@ public:
     explicit AStar(const Grid& grid);
     AStar(const Grid&&) = delete; // Refuse temporaries, we would be left holding a dangling pointer
 
-    // Returns false if end is unreachable
+    // maxTotalExpansions is the give-up limit for the WHOLE search (-> LimitReached), it keeps
+    // unreachable targets from flooding the entire map
+    SearchStatus Begin(size_t startIdx, size_t endIdx, const NavProfile& profile = NavProfile{},
+                       size_t maxTotalExpansions = UNLIMITED_EXPANSIONS);
+
+    // Expands at most maxExpansions and returns SearchStatus
+    // If a search is finished this does nothing
+    SearchStatus Step(size_t maxExpansions);
+
+    // Only succeeds when the status is Found
+    // outPath is cleared first, and start/end inclusive
+    bool GetPath(std::deque<size_t>& outPath) const;
+
+    SearchStatus GetStatus() const { return m_Status; }
+    size_t GetExpansionCount() const { return m_ExpansionCount; }
+
+    // Runs whole search with no slicing
     // outPath is cleared first, and start/end inclusive
     bool FindPath(size_t startIdx, size_t endIdx, std::deque<size_t>& outPath,
-                  const NavProfile& profile = NavProfile{});
+                  const NavProfile& profile = NavProfile{},
+                  size_t maxTotalExpansions = UNLIMITED_EXPANSIONS);
 
     // Read-only access for last search (for debug visualisation)
     const std::vector<Node>& GetOpen() const { return m_Open.get_nodes(); }
@@ -151,6 +187,10 @@ private:
 
     size_t m_StartIdx = INVALID_IDX;
     size_t m_EndIdx = INVALID_IDX;
+
+    SearchStatus m_Status = SearchStatus::Idle;
+    size_t m_ExpansionCount = 0;
+    size_t m_ExpansionLimit = UNLIMITED_EXPANSIONS;
     
     // (Min heap of nodes)
     OpenList m_Open;
